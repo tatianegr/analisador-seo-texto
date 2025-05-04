@@ -54,7 +54,7 @@
         return;
       }
 
-      // Prompt reforçado: pede SOMENTE o JSON puro, sem texto extra
+      // Prompt reforçado: pede somente JSON puro
       const prompt = `
 Você é um analista de SEO. Avalie o texto abaixo de acordo com estes 10 itens e **responda somente** com um objeto JSON válido, sem comentários, sem formatação markdown, sem texto adicional:
 
@@ -74,10 +74,10 @@ Você é um analista de SEO. Avalie o texto abaixo de acordo com estes 10 itens 
 ${content}
       `;
 
-      // Chamada à API
-      let data;
+      // Chamada à API com tratamento de erros
+      let resp, data;
       try {
-        const resp = await fetch('https://api.openai.com/v1/chat/completions', {
+        resp = await fetch('https://api.openai.com/v1/chat/completions', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -92,8 +92,16 @@ ${content}
         });
         data = await resp.json();
       } catch (err) {
-        alert('Erro ao chamar a API. Confira sua conexão e a API Key.');
+        alert('Erro de conexão ou chave inválida. Veja o Console para detalhes.');
         console.error(err);
+        return;
+      }
+
+      // Se a resposta não for 2xx, mostra o erro retornado
+      if (!resp.ok) {
+        const msg = data.error?.message || `Status ${resp.status}`;
+        alert(`Erro da API OpenAI: ${msg}`);
+        console.error('Erro da API:', data);
         return;
       }
 
@@ -101,11 +109,12 @@ ${content}
       const raw = data.choices[0].message.content;
       const match = raw.match(/^\s*(\{[\s\S]*\})\s*$/);
       if (!match) {
-        console.error('Resposta bruta:', raw);
+        console.error('Resposta bruta inesperada:', raw);
         alert('Resposta inesperada da API. Veja o Console para detalhes.');
         return;
       }
 
+      // Faz o parse do JSON
       let analysis;
       try {
         analysis = JSON.parse(match[1]);
@@ -115,7 +124,7 @@ ${content}
         return;
       }
 
-      // Exibe resultados
+      // Exibe resultados coloridos
       const container = document.getElementById('results');
       container.innerHTML = '';
       for (const [keyName, res] of Object.entries(analysis)) {

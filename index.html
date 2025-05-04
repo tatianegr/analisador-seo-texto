@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8">
+  <title>Analisador de Conteúdo SEO</title>
+  <style>
+    body { font-family: sans-serif; margin: 2rem; line-height: 1.5; }
+    label, input, textarea, button { display: block; width: 100%; margin-top: 1rem; }
+    input, textarea { padding: 0.5rem; font-size: 1rem; }
+    textarea { height: 200px; resize: vertical; }
+    button { padding: 0.75rem; font-size: 1rem; cursor: pointer; }
+    .result { margin-top: 1rem; padding: 1rem; border-radius: 4px; }
+    .verde   { background: #e6ffed; border: 1px solid #2ecc71; }
+    .amarelo { background: #fff9e6; border: 1px solid #f1c40f; }
+    .vermelho{ background: #ffe6e6; border: 1px solid #e74c3c; }
+    .item h4 { margin: 0 0 0.5rem; font-size: 1.1rem; }
+    .suggestion { margin: 0.25rem 0 0 1rem; font-size: 0.95rem; }
+  </style>
+</head>
+<body>
+
+  <h2>Analisador de Conteúdo SEO (Texto Puro)</h2>
+
+  <!-- Novo campo para a chave -->
+  <label for="apiKey">Sua OpenAI API Key:</label>
+  <input type="password" id="apiKey" placeholder="Cole aqui sua chave (sk-…)" />
+
+  <label for="keyword">Palavra-chave principal:</label>
+  <input type="text" id="keyword" placeholder="ex: marketing digital">
+
+  <label for="textInput">Cole ou digite seu texto:</label>
+  <textarea id="textInput" placeholder="Seu conteúdo aqui…"></textarea>
+
+  <label for="fileInput">Ou carregue um arquivo .txt:</label>
+  <input type="file" id="fileInput" accept=".txt">
+
+  <button id="analyzeBtn">Analisar Conteúdo</button>
+
+  <div id="results"></div>
+
+  <script>
+    // Carrega texto do arquivo .txt
+    document.getElementById('fileInput').addEventListener('change', async e => {
+      const file = e.target.files[0];
+      if (!file) return;
+      document.getElementById('textInput').value = await file.text();
+    });
+
+    document.getElementById('analyzeBtn').addEventListener('click', async () => {
+      const key = document.getElementById('apiKey').value.trim();
+      const keyword = document.getElementById('keyword').value.trim();
+      const content = document.getElementById('textInput').value.trim();
+      if (!key || !keyword || !content) {
+        alert('Preencha sua API Key, palavra-chave e texto antes de analisar.');
+        return;
+      }
+
+      const prompt = `
+Você é um analista de SEO. Avalie o texto abaixo de acordo com estes 10 itens, retornando um JSON com cada critério contendo:
+- status: "verde" | "amarelo" | "vermelho"
+- suggestion: dica de melhoria quando status ≠ "verde"
+
+1. Título atrativo e otimizado  
+2. Introdução eficiente  
+3. Palavra-chave bem posicionada  
+4. Subtítulos claros e objetivos  
+5. Texto com boa escaneabilidade  
+6. Uso de palavras-chave secundárias e termos relacionados  
+7. Tom adequado ao público  
+8. Textos aprofundados e relevantes  
+9. CTA natural e persuasivo  
+10. Revisão e clareza gramatical  
+
+**Palavra-chave principal:** ${keyword}  
+**Texto para análise:**  
+${content}
+      `;
+
+      const resp = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + key
+        },
+        body: JSON.stringify({
+          model: 'gpt-4o-mini',
+          messages: [{ role: 'user', content: prompt }],
+          temperature: 0.2,
+          max_tokens: 800
+        })
+      });
+
+      const data = await resp.json();
+      let analysis;
+      try {
+        analysis = JSON.parse(data.choices[0].message.content);
+      } catch {
+        alert('Erro ao interpretar resposta da API. Veja o console.');
+        console.error(data);
+        return;
+      }
+
+      const container = document.getElementById('results');
+      container.innerHTML = '';
+      for (const [key, res] of Object.entries(analysis)) {
+        const bloco = document.createElement('div');
+        bloco.className = `result ${res.status}`;
+        bloco.innerHTML = `
+          <div class="item">
+            <h4>${key.charAt(0).toUpperCase()+key.slice(1)}: <strong>${res.status.toUpperCase()}</strong></h4>
+            ${res.status !== 'verde' ? `<p class="suggestion">${res.suggestion}</p>` : ''}
+          </div>`;
+        container.appendChild(bloco);
+      }
+    });
+  </script>
+
+</body>
+</html>
